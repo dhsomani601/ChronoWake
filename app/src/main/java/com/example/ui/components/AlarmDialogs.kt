@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,15 +20,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Alarm
-import androidx.compose.material.icons.filled.Bedtime
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.Vibration
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -38,20 +31,15 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -89,8 +77,7 @@ fun AlarmEditDialog(
     var label by remember { mutableStateOf(alarm.label) }
     var selectedSoundId by remember { mutableStateOf(alarm.soundProfileId) }
     var volumeRampMinutes by remember { mutableIntStateOf(alarm.volumeRampDurationMinutes) }
-    var vibrationPattern by remember { mutableStateOf(alarm.vibrationPattern) }
-    var smartWakeEnabled by remember { mutableStateOf(alarm.smartWakeEnabled) }
+    val vibrationPattern by remember { mutableStateOf(alarm.vibrationPattern) }
     var challengeType by remember { mutableStateOf(alarm.challengeType) }
 
     // Selected days set (1 = Sun, 2 = Mon ... 7 = Sat)
@@ -107,14 +94,14 @@ fun AlarmEditDialog(
             colors = CardDefaults.cardColors(containerColor = MidnightSurface),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 16.dp)
+                .padding(vertical = 12.dp)
                 .testTag("alarm_edit_dialog")
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(20.dp)
+                    .padding(18.dp)
             ) {
                 // Header
                 Row(
@@ -133,40 +120,19 @@ fun AlarmEditDialog(
                     }
                 }
 
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Engaging Interactive Clock Dial & Manual Input
+                ClockDialTimePicker(
+                    hour24 = hour,
+                    minute = minute,
+                    onTimeChanged = { newH, newM ->
+                        hour = newH
+                        minute = newM
+                    }
+                )
+
                 Spacer(modifier = Modifier.height(16.dp))
-
-                // Time adjustment row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Hour container
-                    TimeBox(
-                        value = String.format("%02d", hour),
-                        label = "HOUR",
-                        onIncrement = { hour = (hour + 1) % 24 },
-                        onDecrement = { hour = if (hour == 0) 23 else hour - 1 }
-                    )
-
-                    Text(
-                        text = ":",
-                        color = CyanAccent,
-                        fontSize = 38.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp)
-                    )
-
-                    // Minute container
-                    TimeBox(
-                        value = String.format("%02d", minute),
-                        label = "MINUTE",
-                        onIncrement = { minute = (minute + 5) % 60 },
-                        onDecrement = { minute = if (minute < 5) 55 else minute - 5 }
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(18.dp))
 
                 // Label input
                 OutlinedTextField(
@@ -185,7 +151,7 @@ fun AlarmEditDialog(
                     )
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Repeat Days selector
                 Text(
@@ -226,7 +192,7 @@ fun AlarmEditDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Sound Profile Dropdown
                 Text(
@@ -332,36 +298,7 @@ fun AlarmEditDialog(
                     )
                 )
 
-                // Smart Wake toggle
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "Smart Wake Window (20m)",
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Text(
-                            text = "Wakes gently during lightest sleep cycle",
-                            color = Color.Gray,
-                            fontSize = 11.sp
-                        )
-                    }
-                    Switch(
-                        checked = smartWakeEnabled,
-                        onCheckedChange = { smartWakeEnabled = it },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = MidnightDeep,
-                            checkedTrackColor = CyanAccent
-                        )
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // Wake Challenge selector
                 Text(
@@ -397,7 +334,7 @@ fun AlarmEditDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
                 // Action buttons
                 Row(
@@ -419,7 +356,7 @@ fun AlarmEditDialog(
                                 soundProfileId = selectedSoundId,
                                 volumeRampDurationMinutes = volumeRampMinutes,
                                 vibrationPattern = vibrationPattern,
-                                smartWakeEnabled = smartWakeEnabled,
+                                smartWakeEnabled = false,
                                 challengeType = challengeType
                             )
                             onSave(updated)
@@ -436,43 +373,8 @@ fun AlarmEditDialog(
     }
 }
 
-@Composable
-fun TimeBox(
-    value: String,
-    label: String,
-    onIncrement: () -> Unit,
-    onDecrement: () -> Unit
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .background(MidnightSurfaceCard, RoundedCornerShape(16.dp))
-            .border(1.dp, MidnightSurfaceElevated, RoundedCornerShape(16.dp))
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-    ) {
-        IconButton(onClick = onIncrement, modifier = Modifier.size(28.dp)) {
-            Text("▲", color = CyanAccent, fontSize = 12.sp)
-        }
-        Text(
-            text = value,
-            color = Color.White,
-            fontSize = 38.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            text = label,
-            color = Color.Gray,
-            fontSize = 10.sp,
-            letterSpacing = 1.sp
-        )
-        IconButton(onClick = onDecrement, modifier = Modifier.size(28.dp)) {
-            Text("▼", color = CyanAccent, fontSize = 12.sp)
-        }
-    }
-}
-
 /**
- * Interactive Wizard for shift workers (4 on / 2 off, rotating 3-shifts, or custom interval).
+ * Shift Worker Schedule Wizard with editable clock dial time picker and robust on/off input validation.
  */
 @Composable
 fun ShiftWizardDialog(
@@ -481,11 +383,12 @@ fun ShiftWizardDialog(
 ) {
     var title by remember { mutableStateOf("4 On / 2 Off Rotation") }
     var patternType by remember { mutableStateOf("CUSTOM_ON_OFF") } // CUSTOM_ON_OFF, ROTATING_3_SHIFT, INTERVAL_EVERY_X_DAYS
-    var daysOn by remember { mutableIntStateOf(4) }
-    var daysOff by remember { mutableIntStateOf(2) }
-    var intervalDays by remember { mutableIntStateOf(3) }
+    var onDaysText by remember { mutableStateOf("4") }
+    var offDaysText by remember { mutableStateOf("2") }
+    var intervalDaysText by remember { mutableStateOf("3") }
     var morningHour by remember { mutableIntStateOf(6) }
     var morningMinute by remember { mutableIntStateOf(30) }
+    var validationError by remember { mutableStateOf<String?>(null) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -493,28 +396,37 @@ fun ShiftWizardDialog(
             colors = CardDefaults.cardColors(containerColor = MidnightSurface),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 16.dp)
+                .padding(vertical = 12.dp)
                 .testTag("shift_wizard_dialog")
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(20.dp)
+                    .padding(18.dp)
             ) {
-                Text(
-                    text = "Shift Worker Schedule Wizard",
-                    color = Color.White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Shift Worker Schedule Wizard",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Gray)
+                    }
+                }
                 Text(
                     text = "Automatically sets exact alarms matching your periodic work cycle.",
                     color = Color.Gray,
                     fontSize = 12.sp
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 OutlinedTextField(
                     value = title,
@@ -524,7 +436,8 @@ fun ShiftWizardDialog(
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = CyanAccent
                     )
                 )
 
@@ -542,91 +455,143 @@ fun ShiftWizardDialog(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     ShiftPatternOption(
                         title = "Custom On / Off Rotation (e.g. 4 On / 2 Off)",
-                        description = "Work $daysOn days consecutively, rest $daysOff days",
+                        description = "Work consecutive days, then rest consecutive days",
                         isSelected = patternType == "CUSTOM_ON_OFF",
-                        onClick = { patternType = "CUSTOM_ON_OFF" }
+                        onClick = {
+                            patternType = "CUSTOM_ON_OFF"
+                            validationError = null
+                        }
                     )
                     ShiftPatternOption(
                         title = "Rotating 3-Shift System",
-                        description = "Cycles Morning (06:30), Afternoon (14:00), Night (22:00)",
+                        description = "Cycles Morning, Afternoon, and Night shifts",
                         isSelected = patternType == "ROTATING_3_SHIFT",
-                        onClick = { patternType = "ROTATING_3_SHIFT" }
+                        onClick = {
+                            patternType = "ROTATING_3_SHIFT"
+                            validationError = null
+                        }
                     )
                     ShiftPatternOption(
-                        title = "Custom Periodic Interval (e.g. Every $intervalDays Days)",
-                        description = "On-call or recurring shift every $intervalDays days",
+                        title = "Custom Periodic Interval (e.g. Every N Days)",
+                        description = "On-call or recurring shift every specified interval of days",
                         isSelected = patternType == "INTERVAL_EVERY_X_DAYS",
-                        onClick = { patternType = "INTERVAL_EVERY_X_DAYS" }
+                        onClick = {
+                            patternType = "INTERVAL_EVERY_X_DAYS"
+                            validationError = null
+                        }
                     )
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Detail parameters
+                // Detail parameters with freely editable / clearable fields
                 if (patternType == "CUSTOM_ON_OFF") {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         OutlinedTextField(
-                            value = daysOn.toString(),
-                            onValueChange = { daysOn = it.toIntOrNull()?.coerceIn(1, 14) ?: 4 },
+                            value = onDaysText,
+                            onValueChange = {
+                                onDaysText = it
+                                validationError = null
+                            },
                             label = { Text("Days ON Work") },
+                            placeholder = { Text("e.g. 4") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.weight(1f),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = CyanAccent
                             )
                         )
                         OutlinedTextField(
-                            value = daysOff.toString(),
-                            onValueChange = { daysOff = it.toIntOrNull()?.coerceIn(1, 14) ?: 2 },
+                            value = offDaysText,
+                            onValueChange = {
+                                offDaysText = it
+                                validationError = null
+                            },
                             label = { Text("Days OFF Rest") },
+                            placeholder = { Text("e.g. 2") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.weight(1f),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = CyanAccent
                             )
                         )
                     }
                 } else if (patternType == "INTERVAL_EVERY_X_DAYS") {
                     OutlinedTextField(
-                        value = intervalDays.toString(),
-                        onValueChange = { intervalDays = it.toIntOrNull()?.coerceIn(1, 30) ?: 3 },
+                        value = intervalDaysText,
+                        onValueChange = {
+                            intervalDaysText = it
+                            validationError = null
+                        },
                         label = { Text("Interval (Every N Days)") },
+                        placeholder = { Text("e.g. 3") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = CyanAccent
                         )
                     )
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Shift Wake Time
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Shift Alarm Wake Time:",
-                        color = Color.LightGray,
-                        fontSize = 13.sp
-                    )
-                    Text(
-                        text = String.format("%02d:%02d", morningHour, morningMinute),
-                        color = CyanAccent,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                // Shift Wake Time with full Clock Dial interface
+                Text(
+                    text = "Shift Alarm Wake Time",
+                    color = Color.LightGray,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                ClockDialTimePicker(
+                    hour24 = morningHour,
+                    minute = morningMinute,
+                    onTimeChanged = { newH, newM ->
+                        morningHour = newH
+                        morningMinute = newM
+                    }
+                )
+
+                // Validation error display
+                if (validationError != null) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFEF4444).copy(alpha = 0.2f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.WarningAmber,
+                                contentDescription = null,
+                                tint = Color(0xFFEF4444),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = validationError!!,
+                                color = Color(0xFFFCA5A5),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
                 // Actions
                 Row(
@@ -639,12 +604,43 @@ fun ShiftWizardDialog(
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = {
+                            var parsedOn = 4
+                            var parsedOff = 2
+                            var parsedInterval = 3
+
+                            if (patternType == "CUSTOM_ON_OFF") {
+                                if (onDaysText.isBlank() || offDaysText.isBlank()) {
+                                    validationError = "Please enter both Work and Rest days. Fields cannot be blank."
+                                    return@Button
+                                }
+                                val onNum = onDaysText.trim().toIntOrNull()
+                                val offNum = offDaysText.trim().toIntOrNull()
+                                if (onNum == null || offNum == null || onNum <= 0 || offNum <= 0) {
+                                    validationError = "Work and Rest days must be positive numbers (at least 1 day)."
+                                    return@Button
+                                }
+                                parsedOn = onNum
+                                parsedOff = offNum
+                            } else if (patternType == "INTERVAL_EVERY_X_DAYS") {
+                                if (intervalDaysText.isBlank()) {
+                                    validationError = "Please enter an interval in days. Field cannot be blank."
+                                    return@Button
+                                }
+                                val intNum = intervalDaysText.trim().toIntOrNull()
+                                if (intNum == null || intNum <= 0) {
+                                    validationError = "Interval must be a positive number (at least 1 day)."
+                                    return@Button
+                                }
+                                parsedInterval = intNum
+                            }
+
+                            validationError = null
                             val newShift = ShiftScheduleEntity(
                                 title = title.ifBlank { "Shift Rotation" },
                                 patternType = patternType,
-                                daysOn = daysOn,
-                                daysOff = daysOff,
-                                intervalDays = intervalDays,
+                                daysOn = parsedOn,
+                                daysOff = parsedOff,
+                                intervalDays = parsedInterval,
                                 morningShiftHour = morningHour,
                                 morningShiftMinute = morningMinute,
                                 isActive = true

@@ -2,10 +2,8 @@ package com.example
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
-import com.example.data.AppRepository
 import com.example.sound.SoundProfiles
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -24,21 +22,6 @@ class ExampleRobolectricTest {
   }
 
   @Test
-  fun `verify sleep cycle calculations`() {
-    val context = ApplicationProvider.getApplicationContext<Context>()
-    val repo = AppRepository(context)
-    val wakeTimes = repo.calculateOptimalWakeTimes(System.currentTimeMillis())
-    assertEquals(4, wakeTimes.size) // 3, 4, 5, 6 cycles
-    val bestCycle = wakeTimes.find { it.isRecommendedBest }
-    assertNotNull(bestCycle)
-    assertEquals(5, bestCycle?.cycles)
-    assertEquals(7.5, bestCycle?.durationHours ?: 0.0, 0.01)
-
-    val bedtimes = repo.calculateOptimalBedtimes(7, 0)
-    assertEquals(4, bedtimes.size)
-  }
-
-  @Test
   fun `verify sound profile catalog completeness`() {
     assertTrue(SoundProfiles.ALL.isNotEmpty())
     val theta = SoundProfiles.getById("binaural_theta")
@@ -46,4 +29,3 @@ class ExampleRobolectricTest {
     assertEquals(6f, theta.beatFreqHz)
   }
 }
-

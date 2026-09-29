@@ -23,19 +23,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Alarm
-import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.SelfImprovement
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -48,7 +42,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -60,13 +53,10 @@ import com.example.sound.SoundProfiles
 import com.example.ui.components.AdBannerCard
 import com.example.ui.theme.AmberWake
 import com.example.ui.theme.CyanAccent
-import com.example.ui.theme.LavenderRest
 import com.example.ui.theme.MidnightDeep
-import com.example.ui.theme.MidnightSurface
 import com.example.ui.theme.MidnightSurfaceCard
 import com.example.ui.theme.MidnightSurfaceElevated
 import kotlinx.coroutines.delay
-import java.util.Calendar
 
 @Composable
 fun AlarmsScreen(
@@ -76,7 +66,6 @@ fun AlarmsScreen(
     onEditAlarm: (AlarmEntity) -> Unit,
     onToggleAlarm: (AlarmEntity, Boolean) -> Unit,
     onDeleteAlarm: (Long) -> Unit,
-    onQuickPreset: (hour: Int, minute: Int, label: String) -> Unit,
     onOpenPaywall: () -> Unit
 ) {
     // Find next active alarm
@@ -115,17 +104,12 @@ fun AlarmsScreen(
                 )
             }
 
-            // Quick Preset Chips (Nap, Sleep Cycle, Shift)
-            item {
-                QuickPresetsRow(onQuickPreset = onQuickPreset)
-            }
-
             // Section Header
             item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -244,24 +228,13 @@ fun NextAlarmHeroCard(
                             color = AmberWake.copy(alpha = 0.2f),
                             modifier = Modifier.clickable { onOpenPaywall() }
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
+                            Text(
+                                text = "PRO AD-FREE",
+                                color = AmberWake,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Star,
-                                    contentDescription = null,
-                                    tint = AmberWake,
-                                    modifier = Modifier.size(12.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "PRO AD-FREE",
-                                    color = AmberWake,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                            )
                         }
                     }
                 }
@@ -285,34 +258,17 @@ fun NextAlarmHeroCard(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        val profile = SoundProfiles.getById(nextAlarm.soundProfileId)
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MidnightSurfaceElevated
-                        ) {
-                            Text(
-                                text = "♫ ${profile.name}",
-                                color = Color.LightGray,
-                                fontSize = 11.sp,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-
-                        if (nextAlarm.smartWakeEnabled) {
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = CyanAccent.copy(alpha = 0.15f)
-                            ) {
-                                Text(
-                                    text = "⚡ 20m Smart Wake",
-                                    color = CyanAccent,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
+                    val profile = SoundProfiles.getById(nextAlarm.soundProfileId)
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MidnightSurfaceElevated
+                    ) {
+                        Text(
+                            text = "♫ ${profile.name}",
+                            color = Color.LightGray,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
                     }
                 } else {
                     Text(
@@ -322,91 +278,11 @@ fun NextAlarmHeroCard(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Tap + to set your first smart alarm",
+                        text = "Tap + to set your smart wake alarm",
                         color = Color.Gray,
                         fontSize = 14.sp
                     )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun QuickPresetsRow(
-    onQuickPreset: (hour: Int, minute: Int, label: String) -> Unit
-) {
-    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
-        Text(
-            text = "Quick Presets",
-            color = Color.Gray,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            PresetChip(
-                title = "20m Power Nap",
-                subtitle = "Energy boost",
-                icon = Icons.Default.SelfImprovement,
-                color = CyanAccent,
-                onClick = {
-                    val cal = Calendar.getInstance().apply { add(Calendar.MINUTE, 20) }
-                    onQuickPreset(cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), "20m Power Nap")
-                },
-                modifier = Modifier.weight(1f)
-            )
-
-            PresetChip(
-                title = "90m Full Cycle",
-                subtitle = "1 Sleep cycle",
-                icon = Icons.Default.Bedtime,
-                color = LavenderRest,
-                onClick = {
-                    val cal = Calendar.getInstance().apply { add(Calendar.MINUTE, 90) }
-                    onQuickPreset(cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), "90m Sleep Cycle")
-                },
-                modifier = Modifier.weight(1f)
-            )
-        }
-    }
-}
-
-@Composable
-fun PresetChip(
-    title: String,
-    subtitle: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    color: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MidnightSurfaceCard),
-        modifier = modifier
-            .border(1.dp, MidnightSurfaceElevated, RoundedCornerShape(14.dp))
-            .clickable { onClick() }
-    ) {
-        Row(
-            modifier = Modifier.padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .background(color.copy(alpha = 0.15f), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(16.dp))
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            Column {
-                Text(text = title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                Text(text = subtitle, color = Color.Gray, fontSize = 10.sp)
             }
         }
     }
@@ -490,7 +366,6 @@ fun AlarmCardItem(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Days text
                     val daysDisplay = if (alarm.daysOfWeek.isBlank()) {
                         "Once"
                     } else {
@@ -522,20 +397,6 @@ fun AlarmCardItem(
                                 color = AmberWake,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-
-                    if (alarm.smartWakeEnabled) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = CyanAccent.copy(alpha = 0.15f)
-                        ) {
-                            Text(
-                                text = "Smart Wake",
-                                color = CyanAccent,
-                                fontSize = 11.sp,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
@@ -582,7 +443,7 @@ fun EmptyAlarmsState(onAddAlarm: () -> Unit) {
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "Tap the + button to create your first smart circadian wake schedule.",
+            text = "Tap the + button to create your first smart wake schedule.",
             color = Color.Gray,
             fontSize = 12.sp,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center

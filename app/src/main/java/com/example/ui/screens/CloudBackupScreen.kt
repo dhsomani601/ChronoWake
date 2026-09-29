@@ -21,14 +21,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDone
-import androidx.compose.material.icons.filled.CloudDownload
-import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
-import androidx.compose.material.icons.filled.Policy
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
@@ -37,7 +33,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -65,7 +60,6 @@ import com.example.ui.components.AdBannerCard
 import com.example.ui.theme.AmberWake
 import com.example.ui.theme.CyanAccent
 import com.example.ui.theme.EmeraldActive
-import com.example.ui.theme.LavenderRest
 import com.example.ui.theme.MidnightDeep
 import com.example.ui.theme.MidnightSurface
 import com.example.ui.theme.MidnightSurfaceCard
@@ -106,7 +100,6 @@ fun CloudBackupScreen(
         // Subscription Tier & Ad-Free Card
         item {
             SubscriptionTierCard(
-                userSettings = userSettings,
                 isPro = isPro,
                 onTogglePro = onToggleProTest,
                 onOpenPaywall = onOpenPaywall
@@ -127,11 +120,6 @@ fun CloudBackupScreen(
                     showImportDialog = true
                 }
             )
-        }
-
-        // Play Store Deployment & Guidelines Compliance Card
-        item {
-            PlayStoreComplianceCard()
         }
 
         // Google Ads Banner for free tier
@@ -353,7 +341,6 @@ fun CloudSyncHeroCard(
 
 @Composable
 fun SubscriptionTierCard(
-    userSettings: UserSettingsEntity?,
     isPro: Boolean,
     onTogglePro: (Boolean) -> Unit,
     onOpenPaywall: () -> Unit
@@ -415,7 +402,6 @@ fun SubscriptionTierCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Developer / Reviewer quick toggle
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(
                         checked = isPro,
@@ -502,52 +488,5 @@ fun JsonBackupCard(
                 }
             }
         }
-    }
-}
-
-@Composable
-fun PlayStoreComplianceCard() {
-    Card(
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MidnightSurfaceElevated),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Policy, contentDescription = null, tint = EmeraldActive, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Play Store Deployment Compliance",
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                ComplianceCheckItem("Exact Alarm API (AlarmManager.setAlarmClock)", isPassed = true)
-                ComplianceCheckItem("Foreground Media Playback Service with Ongoing Notification", isPassed = true)
-                ComplianceCheckItem("Zero-Permission Local Room Persistence", isPassed = true)
-                ComplianceCheckItem("Google Play Ad Policy Tagged Sponsored Card", isPassed = true)
-                ComplianceCheckItem("No broad storage permissions required", isPassed = true)
-            }
-        }
-    }
-}
-
-@Composable
-fun ComplianceCheckItem(text: String, isPassed: Boolean) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            imageVector = Icons.Default.CheckCircle,
-            contentDescription = null,
-            tint = if (isPassed) EmeraldActive else Color.Gray,
-            modifier = Modifier.size(15.dp)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(text = text, color = Color.LightGray, fontSize = 11.sp)
     }
 }

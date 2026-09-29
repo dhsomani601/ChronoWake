@@ -51,7 +51,7 @@ private val LightColorScheme =
     )
 
 @Composable
-fun MyApplicationTheme(
+fun ChronoWakeTheme(
     darkTheme: Boolean = true, // Default to sleek night dark theme for sleep/alarm UX
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
@@ -72,3 +72,10 @@ fun MyApplicationTheme(
         content = content
     )
 }
+
+@Composable
+fun MyApplicationTheme(
+    darkTheme: Boolean = true,
+    dynamicColor: Boolean = false,
+    content: @Composable () -> Unit,
+) = ChronoWakeTheme(darkTheme, dynamicColor, content)

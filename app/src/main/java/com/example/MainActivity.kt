@@ -23,17 +23,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Alarm
-import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -66,26 +63,21 @@ import com.example.ui.components.ShiftWizardDialog
 import com.example.ui.screens.AlarmsScreen
 import com.example.ui.screens.CloudBackupScreen
 import com.example.ui.screens.ShiftScreen
-import com.example.ui.screens.SleepCycleScreen
 import com.example.ui.screens.SoundLabScreen
 import com.example.ui.theme.AmberWake
+import com.example.ui.theme.ChronoWakeTheme
 import com.example.ui.theme.CyanAccent
-import com.example.ui.theme.LavenderRest
 import com.example.ui.theme.MidnightDeep
 import com.example.ui.theme.MidnightSurface
-import com.example.ui.theme.MidnightSurfaceCard
 import com.example.ui.theme.MidnightSurfaceElevated
-import com.example.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity() {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
         setContent {
-            MyApplicationTheme(darkTheme = true) {
-                ChronoWakeApp()
+            ChronoWakeTheme {
+                MainApp()
             }
         }
     }
@@ -93,30 +85,23 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChronoWakeApp(
-    viewModel: MainViewModel = viewModel()
-) {
+fun MainApp(viewModel: MainViewModel = viewModel()) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Request Notification permission for Android 13+
+    // Runtime Permission for Notifications (Android 13+)
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
-    ) { _ -> }
+    ) { /* result handled */ }
 
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val permissionStatus = ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS
-            )
-            if (permissionStatus != PackageManager.PERMISSION_GRANTED) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
     }
 
-    // State collections
     val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
     val alarms by viewModel.alarms.collectAsStateWithLifecycle()
     val shifts by viewModel.shifts.collectAsStateWithLifecycle()
@@ -126,7 +111,6 @@ fun ChronoWakeApp(
     val isShiftWizardOpen by viewModel.isShiftWizardOpen.collectAsStateWithLifecycle()
     val isPaywallOpen by viewModel.isPaywallOpen.collectAsStateWithLifecycle()
     val previewingProfileId by viewModel.previewingProfileId.collectAsStateWithLifecycle()
-    val sleepCalcState by viewModel.sleepCalcState.collectAsStateWithLifecycle()
     val statusMessage by viewModel.backupStatusMessage.collectAsStateWithLifecycle()
 
     val isPro = userSettings?.isProUser ?: false
@@ -147,32 +131,33 @@ fun ChronoWakeApp(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
-                            shape = androidx.compose.foundation.shape.CircleShape,
-                            color = CyanAccent.copy(alpha = 0.2f),
-                            modifier = Modifier.size(34.dp)
+                            shape = RoundedCornerShape(10.dp),
+                            color = CyanAccent.copy(alpha = 0.15f),
+                            modifier = Modifier.size(38.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Default.Alarm,
                                     contentDescription = null,
                                     tint = CyanAccent,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     text = "ChronoWake",
                                     color = Color.White,
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontSize = 19.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.5.sp
                                 )
                                 if (isPro) {
-                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     Surface(
-                                        shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
+                                        shape = RoundedCornerShape(4.dp),
                                         color = AmberWake
                                     ) {
                                         Text(
@@ -187,28 +172,13 @@ fun ChronoWakeApp(
                             }
                             Text(
                                 text = when (currentTab) {
-                                    0 -> "Smart Alarms & Shift Cadence"
-                                    1 -> "Shift Worker Periodic Schedules"
-                                    2 -> "90-Min Sleep Cycle Architecture"
-                                    3 -> "Binaural & Acoustic Sound Lab"
-                                    else -> "Cloud Sync & Subscription"
+                                    0 -> "Smart Alarms & Wake Schedules"
+                                    1 -> "Shift Worker Periodic Rotations"
+                                    2 -> "Binaural & Acoustic Sound Lab"
+                                    else -> "Cloud Sync & Configuration"
                                 },
                                 color = Color.Gray,
                                 fontSize = 11.sp
-                            )
-                        }
-                    }
-                },
-                actions = {
-                    if (!isPro) {
-                        IconButton(
-                            onClick = { viewModel.openPaywall() },
-                            modifier = Modifier.testTag("app_bar_upgrade_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Star,
-                                contentDescription = "Upgrade to Pro",
-                                tint = AmberWake
                             )
                         }
                     }
@@ -226,9 +196,8 @@ fun ChronoWakeApp(
                 val navItems = listOf(
                     NavigationItem("Alarms", Icons.Default.Alarm, 0, "nav_alarms"),
                     NavigationItem("Shifts", Icons.Default.DateRange, 1, "nav_shifts"),
-                    NavigationItem("Sleep", Icons.Default.Bedtime, 2, "nav_sleep"),
-                    NavigationItem("Sound Lab", Icons.Default.GraphicEq, 3, "nav_sound"),
-                    NavigationItem("Backup", Icons.Default.CloudDone, 4, "nav_backup")
+                    NavigationItem("Sound Lab", Icons.Default.GraphicEq, 2, "nav_sound"),
+                    NavigationItem("Backup", Icons.Default.CloudDone, 3, "nav_backup")
                 )
 
                 navItems.forEach { item ->
@@ -281,7 +250,6 @@ fun ChronoWakeApp(
                         onEditAlarm = { viewModel.editAlarm(it) },
                         onToggleAlarm = { alarm, enabled -> viewModel.toggleAlarm(alarm, enabled) },
                         onDeleteAlarm = { viewModel.deleteAlarm(it) },
-                        onQuickPreset = { h, m, label -> viewModel.quickSetAlarmFromSleepCycle(h, m, label) },
                         onOpenPaywall = { viewModel.openPaywall() }
                     )
                     1 -> ShiftScreen(
@@ -292,22 +260,14 @@ fun ChronoWakeApp(
                         onDeleteShift = { viewModel.deleteShiftSchedule(it) },
                         onOpenPaywall = { viewModel.openPaywall() }
                     )
-                    2 -> SleepCycleScreen(
-                        calcState = sleepCalcState,
-                        isPro = isPro,
-                        onSetMode = { viewModel.setSleepCalcMode(it) },
-                        onUpdateTime = { h, m -> viewModel.updateSleepTargetTime(h, m) },
-                        onQuickSetAlarm = { h, m, label -> viewModel.quickSetAlarmFromSleepCycle(h, m, label) },
-                        onOpenPaywall = { viewModel.openPaywall() }
-                    )
-                    3 -> SoundLabScreen(
+                    2 -> SoundLabScreen(
                         previewingProfileId = previewingProfileId,
                         isPro = isPro,
                         onTogglePreview = { viewModel.toggleSoundPreview(it) },
                         onStopPreview = { viewModel.stopSoundPreview() },
                         onOpenPaywall = { viewModel.openPaywall() }
                     )
-                    4 -> CloudBackupScreen(
+                    3 -> CloudBackupScreen(
                         userSettings = userSettings,
                         isPro = isPro,
                         onTriggerCloudSync = { viewModel.triggerCloudBackup() },

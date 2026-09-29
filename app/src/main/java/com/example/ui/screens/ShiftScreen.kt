@@ -2,7 +2,6 @@ package com.example.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,24 +17,19 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Nightlight
 import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material.icons.filled.WbTwilight
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -44,7 +38,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -56,14 +49,11 @@ import com.example.data.model.ShiftScheduleEntity
 import com.example.ui.components.AdBannerCard
 import com.example.ui.theme.AmberWake
 import com.example.ui.theme.CyanAccent
-import com.example.ui.theme.LavenderRest
 import com.example.ui.theme.MidnightDeep
-import com.example.ui.theme.MidnightSurface
 import com.example.ui.theme.MidnightSurfaceCard
 import com.example.ui.theme.MidnightSurfaceElevated
 import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
 import java.util.Locale
 
 @Composable
@@ -87,11 +77,6 @@ fun ShiftScreen(
                 activeShift = activeShift,
                 onOpenWizard = onOpenWizard
             )
-        }
-
-        // 14-Day Calendar Preview
-        item {
-            UpcomingShiftTimeline(activeShift = activeShift)
         }
 
         // Section Title: Configured Shifts
@@ -123,7 +108,7 @@ fun ShiftScreen(
             }
         }
 
-        // Shifts List
+        // Shifts List with each respective forecast attached
         if (shifts.isEmpty()) {
             item {
                 EmptyShiftState(onOpenWizard = onOpenWizard)
@@ -138,7 +123,7 @@ fun ShiftScreen(
             }
         }
 
-        // Shift Worker Sleep Optimization Tips
+        // Shift Worker Rest & Circadian Advice
         item {
             ShiftSleepTipsCard()
         }
@@ -246,143 +231,22 @@ fun ShiftWorkerHeroCard(
 }
 
 @Composable
-fun UpcomingShiftTimeline(activeShift: ShiftScheduleEntity?) {
-    Column(modifier = Modifier.padding(vertical = 8.dp)) {
-        Text(
-            text = "Upcoming 14-Day Shift Forecast",
-            color = Color.White,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
-        )
-
-        val daysForecast = remember(activeShift) {
-            val list = mutableListOf<DayShiftStatus>()
-            val cal = Calendar.getInstance()
-            val dayFormat = SimpleDateFormat("EEE", Locale.getDefault())
-            val numFormat = SimpleDateFormat("d", Locale.getDefault())
-
-            val patternDays = when (activeShift?.patternType) {
-                "CUSTOM_ON_OFF" -> (activeShift.daysOn + activeShift.daysOff).coerceAtLeast(1)
-                "ROTATING_3_SHIFT" -> 3
-                "INTERVAL_EVERY_X_DAYS" -> (activeShift.intervalDays).coerceAtLeast(1)
-                else -> 6
-            }
-
-            for (i in 0 until 14) {
-                val dayName = dayFormat.format(cal.time)
-                val dayNum = numFormat.format(cal.time)
-
-                val dayInCycle = i % patternDays
-                val isWork = when (activeShift?.patternType) {
-                    "CUSTOM_ON_OFF" -> dayInCycle < (activeShift.daysOn)
-                    "INTERVAL_EVERY_X_DAYS" -> dayInCycle == 0
-                    "ROTATING_3_SHIFT" -> true
-                    else -> i % 2 == 0
-                }
-
-                val shiftTag = when (activeShift?.patternType) {
-                    "ROTATING_3_SHIFT" -> when (dayInCycle) {
-                        0 -> "Morning"
-                        1 -> "Afternoon"
-                        else -> "Night"
-                    }
-                    else -> if (isWork) "WORK" else "OFF"
-                }
-
-                list.add(DayShiftStatus(dayName, dayNum, isWork, shiftTag, i == 0))
-                cal.add(Calendar.DAY_OF_YEAR, 1)
-            }
-            list
-        }
-
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(daysForecast) { day ->
-                DayShiftCard(day = day)
-            }
-        }
-    }
-}
-
-data class DayShiftStatus(
-    val dayName: String,
-    val dayNum: String,
-    val isWork: Boolean,
-    val shiftTag: String,
-    val isToday: Boolean
-)
-
-@Composable
-fun DayShiftCard(day: DayShiftStatus) {
-    val bgColor = if (day.isWork) {
-        if (day.shiftTag == "Night") Color(0xFF312E81) else Color(0xFF0C4A6E)
-    } else {
-        MidnightSurfaceCard
-    }
-
-    val tagColor = if (day.isWork) CyanAccent else AmberWake
-
-    Card(
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = bgColor),
-        modifier = Modifier
-            .width(68.dp)
-            .border(
-                1.dp,
-                if (day.isToday) CyanAccent else MidnightSurfaceElevated,
-                RoundedCornerShape(14.dp)
-            )
-    ) {
-        Column(
-            modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = day.dayName,
-                color = if (day.isToday) CyanAccent else Color.Gray,
-                fontSize = 11.sp,
-                fontWeight = if (day.isToday) FontWeight.Bold else FontWeight.Normal
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = day.dayNum,
-                color = Color.White,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = tagColor.copy(alpha = 0.2f)
-            ) {
-                Text(
-                    text = day.shiftTag,
-                    color = tagColor,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
 fun ShiftCardItem(
     shift: ShiftScheduleEntity,
     onToggle: (Boolean) -> Unit,
     onDelete: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MidnightSurfaceCard),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
-            .border(1.dp, if (shift.isActive) CyanAccent.copy(alpha = 0.35f) else MidnightSurfaceElevated, RoundedCornerShape(18.dp))
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .border(
+                1.dp,
+                if (shift.isActive) CyanAccent.copy(alpha = 0.35f) else MidnightSurfaceElevated,
+                RoundedCornerShape(20.dp)
+            )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -394,7 +258,7 @@ fun ShiftCardItem(
                     Text(
                         text = shift.title,
                         color = Color.White,
-                        fontSize = 16.sp,
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(2.dp))
@@ -419,7 +283,30 @@ fun ShiftCardItem(
                 )
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Shift's respective 14-day forecast
+            Text(
+                text = "14-Day Cycle Forecast for this shift:",
+                color = Color.LightGray,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+
+            val forecast = remember(shift) {
+                calculateShiftForecast(shift)
+            }
+
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                items(forecast) { day ->
+                    DayShiftCard(day = day)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -427,9 +314,9 @@ fun ShiftCardItem(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Shift Alarm: ${String.format("%02d:%02d", shift.morningShiftHour, shift.morningShiftMinute)}",
+                    text = "Alarm: ${String.format("%02d:%02d", shift.morningShiftHour, shift.morningShiftMinute)}",
                     color = CyanAccent,
-                    fontSize = 12.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold
                 )
 
@@ -441,6 +328,109 @@ fun ShiftCardItem(
                         modifier = Modifier.size(16.dp)
                     )
                 }
+            }
+        }
+    }
+}
+
+private fun calculateShiftForecast(shift: ShiftScheduleEntity): List<DayShiftStatus> {
+    val list = mutableListOf<DayShiftStatus>()
+    val cal = Calendar.getInstance()
+    val dayFormat = SimpleDateFormat("EEE", Locale.getDefault())
+    val numFormat = SimpleDateFormat("d", Locale.getDefault())
+
+    val patternDays = when (shift.patternType) {
+        "CUSTOM_ON_OFF" -> (shift.daysOn + shift.daysOff).coerceAtLeast(1)
+        "ROTATING_3_SHIFT" -> 3
+        "INTERVAL_EVERY_X_DAYS" -> (shift.intervalDays).coerceAtLeast(1)
+        else -> 6
+    }
+
+    for (i in 0 until 14) {
+        val dayName = dayFormat.format(cal.time)
+        val dayNum = numFormat.format(cal.time)
+
+        val dayInCycle = i % patternDays
+        val isWork = when (shift.patternType) {
+            "CUSTOM_ON_OFF" -> dayInCycle < shift.daysOn
+            "INTERVAL_EVERY_X_DAYS" -> dayInCycle == 0
+            "ROTATING_3_SHIFT" -> true
+            else -> i % 2 == 0
+        }
+
+        val shiftTag = when (shift.patternType) {
+            "ROTATING_3_SHIFT" -> when (dayInCycle) {
+                0 -> "Morning"
+                1 -> "Afternoon"
+                else -> "Night"
+            }
+            else -> if (isWork) "WORK" else "OFF"
+        }
+
+        list.add(DayShiftStatus(dayName, dayNum, isWork, shiftTag, i == 0))
+        cal.add(Calendar.DAY_OF_YEAR, 1)
+    }
+    return list
+}
+
+data class DayShiftStatus(
+    val dayName: String,
+    val dayNum: String,
+    val isWork: Boolean,
+    val shiftTag: String,
+    val isToday: Boolean
+)
+
+@Composable
+fun DayShiftCard(day: DayShiftStatus) {
+    val bgColor = if (day.isWork) {
+        if (day.shiftTag == "Night") Color(0xFF312E81) else Color(0xFF0C4A6E)
+    } else {
+        MidnightSurfaceElevated
+    }
+
+    val tagColor = if (day.isWork) CyanAccent else AmberWake
+
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = bgColor),
+        modifier = Modifier
+            .width(62.dp)
+            .border(
+                1.dp,
+                if (day.isToday) CyanAccent else Color(0xFF334155),
+                RoundedCornerShape(12.dp)
+            )
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = day.dayName,
+                color = if (day.isToday) CyanAccent else Color.Gray,
+                fontSize = 10.sp,
+                fontWeight = if (day.isToday) FontWeight.Bold else FontWeight.Normal
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = day.dayNum,
+                color = Color.White,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Surface(
+                shape = RoundedCornerShape(4.dp),
+                color = tagColor.copy(alpha = 0.2f)
+            ) {
+                Text(
+                    text = day.shiftTag,
+                    color = tagColor,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                )
             }
         }
     }
@@ -460,7 +450,7 @@ fun ShiftSleepTipsCard() {
                 Icon(Icons.Default.Nightlight, contentDescription = null, tint = AmberWake, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Circadian Shift Advice",
+                    text = "Shift Rest Advice",
                     color = Color.White,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
@@ -468,7 +458,7 @@ fun ShiftSleepTipsCard() {
             }
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "When transitioning between day and night shifts, use the 90-minute sleep cycle calculator to avoid waking up during Stage 4 delta sleep. Wear blue-blocker glasses when heading home after night shifts to protect melatonin production.",
+                text = "When transitioning between day and night shifts, keep your bedroom pitch black and cool. Wear dark sunglasses when commuting home from night shifts to prevent morning sunlight from disrupting your daytime melatonin release.",
                 color = Color(0xFFCBD5E1),
                 fontSize = 12.sp,
                 lineHeight = 17.sp
