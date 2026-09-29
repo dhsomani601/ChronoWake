@@ -1,2 +1,2 @@
-- name: Android Release APK
+  name: Android Release APK
   uses: Mattschoe/action-release-apk@v1
