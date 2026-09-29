@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Left Alarm Bell / Hammer Base -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M34,26 C31,23 27,24 25,27 C23,30 24,34 27,36 L34,31 Z" />
+
+    <!-- Right Alarm Bell -->
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M74,26 C77,23 81,24 83,27 C85,30 84,34 81,36 L74,31 Z" />
+
+    <!-- Top Snooze / Handle Bar -->
+    <path
+        android:fillColor="#E2E8F0"
+        android:pathData="M48,22 L60,22 C61.1,22 62,22.9 62,24 C62,25.1 61.1,26 60,26 L48,26 C46.9,26 46,25.1 46,24 C46,22.9 46.9,22 48,22 Z" />
+
+    <!-- Outer Alarm Clock Dial Ring -->
+    <path
+        android:fillColor="#1E293B"
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="3.5"
+        android:pathData="M54,28 A28,28 0 1,1 53.9,28 Z" />
+
+    <!-- Inner Crescent Moon Sleep Rhythm Silhouette -->
+    <path
+        android:fillColor="#818CF8"
+        android:fillAlpha="0.35"
+        android:pathData="M66,38 C56,38 48,46 48,56 C48,66 56,74 66,74 C60,74 53,69 53,56 C53,43 60,38 66,38 Z" />
+
+    <!-- Circadian Pulse / Sleep Wave across bottom dial -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M34,60 C38,60 41,54 44,54 C47,54 49,66 52,66 C55,66 57,58 60,58 C63,58 66,62 74,62" />
+
+    <!-- Clock Center Pivot Dot -->
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M54,53 A3,3 0 1,1 53.9,53 Z" />
+
+    <!-- Clock Hour Hand (pointing towards 7 o'clock) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M54,54 L47,63" />
+
+    <!-- Clock Minute Hand (pointing towards 12 o'clock) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:pathData="M54,54 L54,38" />
+
+    <!-- Left Foot Base -->
+    <path
+        android:fillColor="#94A3B8"
+        android:pathData="M37,80 L32,86 C31.5,86.6 32,87.5 32.8,87.5 L37.5,87.5 C38,87.5 38.5,87.2 38.8,86.7 L42,81 Z" />
+
+    <!-- Right Foot Base -->
+    <path
+        android:fillColor="#94A3B8"
+        android:pathData="M71,80 L76,86 C76.5,86.6 76,87.5 75.2,87.5 L70.5,87.5 C70,87.5 69.5,87.2 69.2,86.7 L66,81 Z" />
+</vector>

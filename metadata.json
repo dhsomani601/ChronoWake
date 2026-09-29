@@ -1,0 +1,6 @@
+{
+  "name": "ChronoWake",
+  "description": "Advanced smart alarm with sleep cycle analysis, shift worker periodic schedules, custom sound profiles, and automated cloud backup.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
