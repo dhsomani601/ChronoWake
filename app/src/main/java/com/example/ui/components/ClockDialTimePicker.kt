@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -43,19 +44,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.CyanAccent
 import com.example.ui.theme.MidnightDeep
 import com.example.ui.theme.MidnightSurfaceCard
 import com.example.ui.theme.MidnightSurfaceElevated
-import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.roundToInt
@@ -125,7 +122,7 @@ fun ClockDialTimePicker(
             .fillMaxWidth()
             .background(MidnightSurfaceCard, RoundedCornerShape(20.dp))
             .border(1.dp, MidnightSurfaceElevated, RoundedCornerShape(20.dp))
-            .padding(16.dp),
+            .padding(14.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Digital readout & mode switch row
@@ -146,13 +143,13 @@ fun ClockDialTimePicker(
                             activeTab = ClockPickerTab.HOUR
                             inputMode = ClockInputMode.DIAL
                         }
-                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Text(
                         text = String.format("%02d", currentHour12),
                         color = if (activeTab == ClockPickerTab.HOUR && inputMode == ClockInputMode.DIAL)
                             CyanAccent else Color.White,
-                        fontSize = 32.sp,
+                        fontSize = 30.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -160,7 +157,7 @@ fun ClockDialTimePicker(
                 Text(
                     text = ":",
                     color = Color.Gray,
-                    fontSize = 28.sp,
+                    fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 4.dp)
                 )
@@ -175,13 +172,13 @@ fun ClockDialTimePicker(
                             activeTab = ClockPickerTab.MINUTE
                             inputMode = ClockInputMode.DIAL
                         }
-                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Text(
                         text = String.format("%02d", minute),
                         color = if (activeTab == ClockPickerTab.MINUTE && inputMode == ClockInputMode.DIAL)
                             CyanAccent else Color.White,
-                        fontSize = 32.sp,
+                        fontSize = 30.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -248,7 +245,7 @@ fun ClockDialTimePicker(
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         AnimatedContent(
             targetState = inputMode,
@@ -369,7 +366,7 @@ fun ClockFaceDial(
     onMinuteSelected: (Int) -> Unit,
     onHourConfirmed: () -> Unit
 ) {
-    val dialSize = 220.dp
+    val dialSize = 210.dp
 
     Box(
         modifier = Modifier
@@ -467,22 +464,23 @@ fun ClockFaceDial(
             // Draw active selector bulb
             drawCircle(
                 color = CyanAccent,
-                radius = 18.dp.toPx(),
+                radius = 17.dp.toPx(),
                 center = handEnd
             )
         }
 
-        // Draw numbers around the dial
+        // Draw numbers around the dial positioned using offset (supports positive & negative)
         val numbers = if (activeTab == ClockPickerTab.HOUR) {
             listOf(12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
         } else {
             listOf(0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55)
         }
 
+        val dialRadiusDp = 76.dp
+
         for (i in 0 until 12) {
             val angleDeg = i * 30.0 - 90.0
             val angleRad = Math.toRadians(angleDeg)
-            val radiusPx = 80.dp
 
             val num = numbers[i]
             val isSelected = if (activeTab == ClockPickerTab.HOUR) {
@@ -492,11 +490,12 @@ fun ClockFaceDial(
             }
 
             val displayText = if (activeTab == ClockPickerTab.HOUR) "$num" else String.format("%02d", num)
+            val offsetX = (dialRadiusDp.value * cos(angleRad)).dp
+            val offsetY = (dialRadiusDp.value * sin(angleRad)).dp
 
             Box(
                 modifier = Modifier
-                    .size(dialSize)
-                    .padding(8.dp),
+                    .size(dialSize),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -504,10 +503,7 @@ fun ClockFaceDial(
                     color = if (isSelected) MidnightDeep else Color.White,
                     fontSize = 13.sp,
                     fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
-                    modifier = Modifier.padding(
-                        start = (radiusPx.value * cos(angleRad)).dp * 1.6f,
-                        top = (radiusPx.value * sin(angleRad)).dp * 1.6f
-                    )
+                    modifier = Modifier.offset(x = offsetX, y = offsetY)
                 )
             }
         }

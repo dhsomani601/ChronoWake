@@ -1,26 +1,27 @@
-name: Build & Release APK
+name: Build & Release Update
 
 on:
-  release:
-    types: [published, created]
-  workflow_dispatch:
   push:
     branches:
       - main
+      - master
     tags:
       - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build Android APK
+  build-and-release:
+    name: Build & Auto Release APK
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -37,22 +38,41 @@ jobs:
       - name: Build Debug APK
         run: ./gradlew assembleDebug --no-daemon
 
-      - name: Upload APK as Workflow Artifact
+      - name: Prepare Release Artifacts
+        run: |
+          mkdir -p release_assets
+          TAG_VER="${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v1.0.{0}', github.run_number) }}"
+          cp app/build/outputs/apk/debug/app-debug.apk "release_assets/ChronoWake-${TAG_VER}.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk release_assets/ChronoWake-latest.apk
+
+      - name: Upload Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ChronoWake-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: ChronoWake-APK
+          path: release_assets/
           retention-days: 30
 
-      - name: Publish APK to GitHub Release
-        if: github.event_name == 'release' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+      - name: Publish Automated GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name != 'main' && github.ref_name || 'v1.0.0' }}
-          name: ${{ github.event.release.name || 'ChronoWake v1.0.0 Release' }}
-          body: "Automated build of ChronoWake APK. Download and install app-debug.apk below."
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v1.0.{0}', github.run_number) }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && format('ChronoWake {0}', github.ref_name) || format('ChronoWake Update v1.0.{0}', github.run_number) }}
+          body: |
+            ## 🚀 ChronoWake Automatic Update
+            
+            An updated build was automatically compiled and released on push to `${{ github.ref_name }}`.
+            
+            ### 📥 Download & Install
+            - **[ChronoWake-latest.apk](https://github.com/${{ github.repository }}/releases/latest/download/ChronoWake-latest.apk)** *(Always the newest build)*
+            - **ChronoWake-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v1.0.{0}', github.run_number) }}.apk** *(Version build)*
+            
+            ### 🔍 Commit Info
+            - **Commit:** `${{ github.sha }}`
+            - **Ref:** `${{ github.ref }}`
           draft: false
           prerelease: false
-          files: app/build/outputs/apk/debug/app-debug.apk
+          generate_release_notes: true
+          make_latest: true
+          files: release_assets/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

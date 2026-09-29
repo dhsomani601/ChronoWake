@@ -1,5 +1,10 @@
 package com.example.sound
 
+import android.content.Context
+import android.content.SharedPreferences
+import org.json.JSONArray
+import org.json.JSONObject
+
 data class SoundProfile(
     val id: String,
     val name: String,
@@ -9,7 +14,8 @@ data class SoundProfile(
     val beatFreqHz: Float,
     val defaultRampMinutes: Int,
     val isProOnly: Boolean = false,
-    val iconName: String = "waves"
+    val iconName: String = "waves",
+    val customUriString: String? = null
 )
 
 enum class SoundCategory {
@@ -17,11 +23,12 @@ enum class SoundCategory {
     GENTLE_NATURE,
     ZEN_MEDITATION,
     CLASSIC_ALARM,
-    ENERGETIC
+    ENERGETIC,
+    CUSTOM_RINGTONE
 }
 
 object SoundProfiles {
-    val ALL = listOf(
+    val BUILT_IN = listOf(
         SoundProfile(
             id = "binaural_theta",
             name = "Binaural Theta (6Hz)",
@@ -101,7 +108,89 @@ object SoundProfiles {
         )
     )
 
-    fun getById(id: String): SoundProfile {
-        return ALL.firstOrNull { it.id == id } ?: ALL[0]
+    val ALL: List<SoundProfile>
+        get() = BUILT_IN
+
+    private const val PREFS_NAME = "custom_ringtones_prefs"
+    private const val KEY_CUSTOM_RINGTONES = "saved_custom_ringtones"
+
+    fun getCustomProfiles(context: Context): List<SoundProfile> {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val jsonString = prefs.getString(KEY_CUSTOM_RINGTONES, null) ?: return emptyList()
+        val list = mutableListOf<SoundProfile>()
+        try {
+            val arr = JSONArray(jsonString)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                list.add(
+                    SoundProfile(
+                        id = obj.getString("id"),
+                        name = obj.getString("name"),
+                        description = obj.optString("description", "Custom Selected Ringtone"),
+                        category = SoundCategory.CUSTOM_RINGTONE,
+                        carrierFreqHz = 440f,
+                        beatFreqHz = 0f,
+                        defaultRampMinutes = 2,
+                        isProOnly = false,
+                        iconName = "music_note",
+                        customUriString = obj.optString("uri")
+                    )
+                )
+            }
+        } catch (_: Exception) {}
+        return list
+    }
+
+    fun addCustomProfile(context: Context, name: String, uriString: String): SoundProfile {
+        val current = getCustomProfiles(context).toMutableList()
+        val id = "custom_" + System.currentTimeMillis()
+        val newProfile = SoundProfile(
+            id = id,
+            name = name,
+            description = "Custom User Ringtone",
+            category = SoundCategory.CUSTOM_RINGTONE,
+            carrierFreqHz = 440f,
+            beatFreqHz = 0f,
+            defaultRampMinutes = 2,
+            isProOnly = false,
+            iconName = "music_note",
+            customUriString = uriString
+        )
+        current.add(newProfile)
+        saveCustomProfiles(context, current)
+        return newProfile
+    }
+
+    fun removeCustomProfile(context: Context, id: String) {
+        val current = getCustomProfiles(context).toMutableList()
+        current.removeAll { it.id == id }
+        saveCustomProfiles(context, current)
+    }
+
+    private fun saveCustomProfiles(context: Context, list: List<SoundProfile>) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val arr = JSONArray()
+        for (item in list) {
+            val obj = JSONObject()
+            obj.put("id", item.id)
+            obj.put("name", item.name)
+            obj.put("description", item.description)
+            obj.put("uri", item.customUriString ?: "")
+            arr.put(obj)
+        }
+        prefs.edit().putString(KEY_CUSTOM_RINGTONES, arr.toString()).apply()
+    }
+
+    fun getAllProfiles(context: Context?): List<SoundProfile> {
+        val custom = if (context != null) getCustomProfiles(context) else emptyList()
+        return custom + BUILT_IN
+    }
+
+    fun getById(id: String, context: Context? = null): SoundProfile {
+        if (context != null) {
+            val custom = getCustomProfiles(context).firstOrNull { it.id == id }
+            if (custom != null) return custom
+        }
+        return BUILT_IN.firstOrNull { it.id == id } ?: BUILT_IN[0]
     }
 }

@@ -120,21 +120,23 @@ class AppRepository(
                 val morningAlarm = AlarmEntity(
                     hour = shift.morningShiftHour,
                     minute = shift.morningShiftMinute,
-                    label = "${shift.title} (Morning)",
+                    label = "${shift.title} - ${shift.shiftTypeName.ifBlank { "Morning Shift" }}",
                     shiftScheduleId = shift.id,
-                    shiftTypeTag = "MORNING",
+                    shiftDayIndex = 0,
+                    shiftTypeTag = shift.shiftTypeName.ifBlank { "Morning" },
                     soundProfileId = "energetic_pulse",
                     volumeRampDurationMinutes = 2
                 )
                 saveAlarm(morningAlarm)
 
-                // Afternoon shift alarm
+                // Afternoon / Evening shift alarm
                 val afternoonAlarm = AlarmEntity(
                     hour = shift.afternoonShiftHour,
                     minute = shift.afternoonShiftMinute,
-                    label = "${shift.title} (Afternoon)",
+                    label = "${shift.title} - ${shift.afternoonShiftName.ifBlank { "Evening Shift" }}",
                     shiftScheduleId = shift.id,
-                    shiftTypeTag = "AFTERNOON",
+                    shiftDayIndex = 1,
+                    shiftTypeTag = shift.afternoonShiftName.ifBlank { "Evening" },
                     soundProfileId = "gentle_sunrise",
                     volumeRampDurationMinutes = 3
                 )
@@ -144,9 +146,10 @@ class AppRepository(
                 val nightAlarm = AlarmEntity(
                     hour = shift.nightShiftHour,
                     minute = shift.nightShiftMinute,
-                    label = "${shift.title} (Night)",
+                    label = "${shift.title} - ${shift.nightShiftName.ifBlank { "Night Shift" }}",
                     shiftScheduleId = shift.id,
-                    shiftTypeTag = "NIGHT",
+                    shiftDayIndex = 2,
+                    shiftTypeTag = shift.nightShiftName.ifBlank { "Night" },
                     soundProfileId = "binaural_theta",
                     volumeRampDurationMinutes = 5
                 )
@@ -156,8 +159,10 @@ class AppRepository(
                 val intervalAlarm = AlarmEntity(
                     hour = shift.morningShiftHour,
                     minute = shift.morningShiftMinute,
-                    label = "${shift.title} (Every ${shift.intervalDays}d)",
+                    label = "${shift.title} - ${shift.shiftTypeName.ifBlank { "Shift" }} (Every ${shift.intervalDays}d)",
                     shiftScheduleId = shift.id,
+                    shiftDayIndex = 0,
+                    shiftTypeTag = shift.shiftTypeName.ifBlank { "WORK" },
                     isPeriodicInterval = true,
                     periodicIntervalDays = shift.intervalDays,
                     periodicStartDateMillis = shift.startDateMillis,
@@ -166,16 +171,38 @@ class AppRepository(
                 saveAlarm(intervalAlarm)
             }
             else -> {
-                // Custom On/Off
-                val onOffAlarm = AlarmEntity(
-                    hour = shift.morningShiftHour,
-                    minute = shift.morningShiftMinute,
-                    label = "${shift.title} (${shift.daysOn}on/${shift.daysOff}off)",
-                    shiftScheduleId = shift.id,
-                    shiftTypeTag = "WORK",
-                    soundProfileId = "zen_chimes"
+                // Custom On/Off with distinct alarm for each ON day and each OFF day
+                val configs = com.example.data.model.parseShiftDayConfigs(
+                    json = shift.dayConfigsJson,
+                    daysOn = shift.daysOn,
+                    daysOff = shift.daysOff,
+                    defaultOnHour = shift.morningShiftHour,
+                    defaultOnMinute = shift.morningShiftMinute,
+                    defaultShiftName = shift.shiftTypeName,
+                    defaultOffHour = shift.offShiftHour,
+                    defaultOffMinute = shift.offShiftMinute
                 )
-                saveAlarm(onOffAlarm)
+
+                for (config in configs) {
+                    if (config.isEnabled) {
+                        for (alarmItem in config.alarms) {
+                            if (alarmItem.isEnabled) {
+                                val dayLabel = if (config.isWork) "Day ${config.dayNumber}" else "Off Day ${config.dayNumber - shift.daysOn}"
+                                val alarm = AlarmEntity(
+                                    hour = alarmItem.hour,
+                                    minute = alarmItem.minute,
+                                    label = "${shift.title} - $dayLabel: ${alarmItem.label} (${config.shiftName})",
+                                    shiftScheduleId = shift.id,
+                                    shiftDayIndex = config.dayNumber - 1,
+                                    shiftTypeTag = if (config.isWork) config.shiftName.ifBlank { "WORK" } else "OFF",
+                                    soundProfileId = if (config.isWork) "zen_chimes" else "gentle_sunrise",
+                                    isEnabled = shift.isActive
+                                )
+                                saveAlarm(alarm)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -423,17 +450,10 @@ class AppRepository(
         }
 
         val shifts = shiftDao.getAllShiftSchedulesSync()
-        if (shifts.isEmpty()) {
-            val sampleShift = ShiftScheduleEntity(
-                title = "4-Day Shift Rotation",
-                patternType = "CUSTOM_ON_OFF",
-                daysOn = 4,
-                daysOff = 2,
-                morningShiftHour = 6,
-                morningShiftMinute = 15,
-                isActive = false
-            )
-            shiftDao.insertShiftSchedule(sampleShift)
+        // Remove any legacy sample shift created previously
+        val legacySampleShifts = shifts.filter { it.title == "4-Day Shift Rotation" && !it.isActive }
+        for (legacy in legacySampleShifts) {
+            deleteShiftSchedule(legacy.id)
         }
 
         val settings = settingsDao.getUserSettingsSync()

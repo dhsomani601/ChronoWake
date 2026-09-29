@@ -88,8 +88,9 @@ class AlarmScheduler(private val context: Context) {
 
         // 2. Custom Periodic Interval (e.g. Every X days)
         if (alarm.isPeriodicInterval && alarm.periodicIntervalDays > 0) {
+            val anchorMillis = if (alarm.periodicStartDateMillis > 0) alarm.periodicStartDateMillis else now.timeInMillis
             val startCal = Calendar.getInstance().apply {
-                timeInMillis = alarm.periodicStartDateMillis.coerceAtLeast(now.timeInMillis)
+                timeInMillis = anchorMillis
                 set(Calendar.HOUR_OF_DAY, alarm.hour)
                 set(Calendar.MINUTE, alarm.minute)
                 set(Calendar.SECOND, 0)
@@ -99,6 +100,39 @@ class AlarmScheduler(private val context: Context) {
                 startCal.add(Calendar.DAY_OF_YEAR, alarm.periodicIntervalDays)
             }
             return startCal.timeInMillis
+        }
+
+        // 3. Cyclic Alarm Cadence (e.g. Active for X days, Inactive for Y days)
+        if (alarm.isCyclicAlarm) {
+            val activeDays = alarm.cyclicDaysActive.coerceAtLeast(1)
+            val inactiveDays = alarm.cyclicDaysInactive.coerceAtLeast(0)
+            val cycleLen = activeDays + inactiveDays
+            val anchor = if (alarm.cyclicStartDateMillis > 0) alarm.cyclicStartDateMillis else now.timeInMillis
+            val anchorCal = Calendar.getInstance().apply {
+                timeInMillis = anchor
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+
+            for (dayOffset in 0..60) {
+                val candidateCal = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, alarm.hour)
+                    set(Calendar.MINUTE, alarm.minute)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                    add(Calendar.DAY_OF_YEAR, dayOffset)
+                }
+                if (candidateCal.timeInMillis <= now.timeInMillis) continue
+
+                val diffDays = ((candidateCal.timeInMillis - anchorCal.timeInMillis) / (24 * 3600 * 1000L)).toInt()
+                val offsetInCycle = ((diffDays % cycleLen) + cycleLen) % cycleLen
+                if (offsetInCycle < activeDays) {
+                    return candidateCal.timeInMillis
+                }
+            }
+            return now.timeInMillis + 24 * 3600 * 1000L
         }
 
         // 3. Repeating days of week (1 = Sun, 2 = Mon ... 7 = Sat)
@@ -175,8 +209,13 @@ class AlarmScheduler(private val context: Context) {
             val diffDays = ((candidateCal.timeInMillis - startCal.timeInMillis) / (24 * 3600 * 1000L)).toInt().coerceAtLeast(0)
             val dayInCycle = diffDays % patternDays
 
-            val isWorkDay = when (shift.patternType) {
-                "CUSTOM_ON_OFF" -> dayInCycle < shift.daysOn
+            val isDayMatch = if (alarm.shiftDayIndex != null) {
+                dayInCycle == alarm.shiftDayIndex
+            } else when (shift.patternType) {
+                "CUSTOM_ON_OFF" -> {
+                    if (alarm.shiftTypeTag == "OFF") dayInCycle >= shift.daysOn
+                    else dayInCycle < shift.daysOn
+                }
                 "INTERVAL_EVERY_X_DAYS" -> dayInCycle == 0
                 "ROTATING_3_SHIFT" -> {
                     // Match shift tag
@@ -190,7 +229,7 @@ class AlarmScheduler(private val context: Context) {
                 else -> true
             }
 
-            if (isWorkDay) {
+            if (isDayMatch) {
                 return candidateCal.timeInMillis
             }
         }

@@ -1,10 +1,17 @@
 package com.example.ui.screens
 
+import android.app.Activity
 import android.content.Context
+import android.content.Intent
+import android.media.MediaPlayer
+import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -30,8 +37,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Vibration
@@ -41,10 +51,11 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -60,6 +71,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.sound.SoundCategory
 import com.example.sound.SoundProfile
 import com.example.sound.SoundProfiles
 import com.example.ui.components.AdBannerCard
@@ -81,6 +93,81 @@ fun SoundLabScreen(
 ) {
     val context = LocalContext.current
 
+    // Custom ringtone state
+    var customRingtones by remember { mutableStateOf(SoundProfiles.getCustomProfiles(context)) }
+    var previewingCustomId by remember { mutableStateOf<String?>(null) }
+    var customPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+
+    // Stop custom preview on dispose
+    DisposableEffect(Unit) {
+        onDispose {
+            customPlayer?.stop()
+            customPlayer?.release()
+            customPlayer = null
+        }
+    }
+
+    fun playCustomAudio(profile: SoundProfile) {
+        onStopPreview()
+        if (previewingCustomId == profile.id) {
+            customPlayer?.stop()
+            customPlayer?.release()
+            customPlayer = null
+            previewingCustomId = null
+            return
+        }
+        customPlayer?.stop()
+        customPlayer?.release()
+        customPlayer = null
+
+        val uriStr = profile.customUriString
+        if (!uriStr.isNullOrBlank()) {
+            try {
+                val mp = MediaPlayer().apply {
+                    setDataSource(context, Uri.parse(uriStr))
+                    isLooping = true
+                    prepare()
+                    start()
+                }
+                customPlayer = mp
+                previewingCustomId = profile.id
+            } catch (_: Exception) {
+                previewingCustomId = null
+            }
+        }
+    }
+
+    // System ringtone picker launcher
+    val ringtonePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI, Uri::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            }
+            if (uri != null) {
+                val r = RingtoneManager.getRingtone(context, uri)
+                val title = r?.getTitle(context) ?: "Device Ringtone"
+                SoundProfiles.addCustomProfile(context, title, uri.toString())
+                customRingtones = SoundProfiles.getCustomProfiles(context)
+            }
+        }
+    }
+
+    // Audio file picker launcher
+    val audioFilePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val title = uri.lastPathSegment?.substringAfterLast('/')?.take(25) ?: "Custom Audio"
+            SoundProfiles.addCustomProfile(context, title, uri.toString())
+            customRingtones = SoundProfiles.getCustomProfiles(context)
+        }
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 96.dp)
@@ -88,9 +175,158 @@ fun SoundLabScreen(
         // Hero Card
         item {
             SoundLabHeroCard(
-                isPlaying = previewingProfileId != null,
-                onStop = onStopPreview
+                isPlaying = previewingProfileId != null || previewingCustomId != null,
+                onStop = {
+                    onStopPreview()
+                    customPlayer?.stop()
+                    customPlayer?.release()
+                    customPlayer = null
+                    previewingCustomId = null
+                }
             )
+        }
+
+        // Section: Custom Ringtones
+        item {
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MidnightSurfaceCard),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .border(1.dp, MidnightSurfaceElevated, RoundedCornerShape(20.dp))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.MusicNote, contentDescription = null, tint = CyanAccent, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Custom Ringtones (${customRingtones.size})",
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Add system tones or custom audio files to use as selectable alarm tones.",
+                        color = Color.Gray,
+                        fontSize = 12.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                                    putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM or RingtoneManager.TYPE_RINGTONE)
+                                    putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                                    putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                                }
+                                ringtonePickerLauncher.launch(intent)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = CyanAccent),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, tint = MidnightDeep, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("System Tone", color = MidnightDeep, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                audioFilePickerLauncher.launch("audio/*")
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Audio File", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    if (customRingtones.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            customRingtones.forEach { profile ->
+                                val isThisPlaying = previewingCustomId == profile.id
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MidnightSurfaceElevated,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.weight(1f),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            IconButton(
+                                                onClick = { playCustomAudio(profile) },
+                                                modifier = Modifier.size(36.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (isThisPlaying) Icons.Default.Stop else Icons.Default.PlayArrow,
+                                                    contentDescription = "Preview",
+                                                    tint = CyanAccent
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column {
+                                                Text(
+                                                    text = profile.name,
+                                                    color = Color.White,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                Text(
+                                                    text = "Selectable in any alarm",
+                                                    color = CyanAccent,
+                                                    fontSize = 10.sp
+                                                )
+                                            }
+                                        }
+
+                                        IconButton(
+                                            onClick = {
+                                                if (previewingCustomId == profile.id) {
+                                                    customPlayer?.stop()
+                                                    customPlayer?.release()
+                                                    customPlayer = null
+                                                    previewingCustomId = null
+                                                }
+                                                SoundProfiles.removeCustomProfile(context, profile.id)
+                                                customRingtones = SoundProfiles.getCustomProfiles(context)
+                                            },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Gray, modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // Section: Sound Profiles
@@ -124,6 +360,12 @@ fun SoundLabScreen(
                 isPlaying = isPlaying,
                 isPro = isPro,
                 onTogglePlay = {
+                    if (previewingCustomId != null) {
+                        customPlayer?.stop()
+                        customPlayer?.release()
+                        customPlayer = null
+                        previewingCustomId = null
+                    }
                     if (profile.isProOnly && !isPro) {
                         onOpenPaywall()
                     } else {
@@ -168,8 +410,8 @@ fun SoundLabHeroCard(
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color(0xFF0F3B5F).copy(alpha = 0.4f),
-                            MidnightSurfaceCard
+                            Color(0xFF1E293B),
+                            Color(0xFF0F172A)
                         )
                     )
                 )
@@ -182,10 +424,15 @@ fun SoundLabHeroCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.GraphicEq, contentDescription = null, tint = CyanAccent, modifier = Modifier.size(18.dp))
+                        Icon(
+                            imageVector = Icons.Default.GraphicEq,
+                            contentDescription = null,
+                            tint = CyanAccent,
+                            modifier = Modifier.size(20.dp)
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "CUSTOM SOUND PROFILES & SYNTHESIS",
+                            text = "ACOUSTIC BIO-SYNTHESIS",
                             color = CyanAccent,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
@@ -196,16 +443,26 @@ fun SoundLabHeroCard(
                     if (isPlaying) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFFEF4444).copy(alpha = 0.2f),
+                            color = AmberWake.copy(alpha = 0.2f),
                             modifier = Modifier.clickable { onStop() }
                         ) {
                             Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.Stop, contentDescription = "Stop", tint = Color(0xFFEF4444), modifier = Modifier.size(14.dp))
+                                Icon(
+                                    imageVector = Icons.Default.Stop,
+                                    contentDescription = "Stop",
+                                    tint = AmberWake,
+                                    modifier = Modifier.size(14.dp)
+                                )
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("STOP", color = Color(0xFFEF4444), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = "STOP",
+                                    color = AmberWake,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
                     }
@@ -214,19 +471,19 @@ fun SoundLabHeroCard(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Text(
-                    text = "Neuro-Acoustic Waking Tones",
+                    text = "Circadian Soundscapes & Ringtones",
                     color = Color.White,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = "Unlike harsh abrupt alarms that shock your autonomic nervous system, our sound profiles use progressive volume rise, harmonic overtone decay, and binaural beat delta-to-alpha brainwave transitions.",
-                    color = Color.LightGray,
-                    fontSize = 12.sp,
-                    lineHeight = 17.sp
+                    text = "Binaural beat entrainment, ambient natural harmonics, and custom imported ringtones configured for stress-free waking.",
+                    color = Color.Gray,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp
                 )
             }
         }
@@ -240,10 +497,19 @@ fun SoundProfileCard(
     isPro: Boolean,
     onTogglePlay: () -> Unit
 ) {
-    val isLocked = profile.isProOnly && !isPro
+    val infiniteTransition = rememberInfiniteTransition(label = "profile_pulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "sound_pulse"
+    )
 
     Card(
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isPlaying) MidnightSurfaceElevated else MidnightSurfaceCard
         ),
@@ -253,27 +519,26 @@ fun SoundProfileCard(
             .border(
                 1.dp,
                 if (isPlaying) CyanAccent else MidnightSurfaceElevated,
-                RoundedCornerShape(18.dp)
+                RoundedCornerShape(16.dp)
             )
-            .clickable { onTogglePlay() }
             .testTag("sound_profile_${profile.id}")
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = profile.name,
-                        color = if (isPlaying) CyanAccent else Color.White,
+                        color = Color.White,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    if (isLocked) {
+                    if (profile.isProOnly) {
                         Spacer(modifier = Modifier.width(6.dp))
                         Surface(
                             shape = RoundedCornerShape(4.dp),
@@ -283,38 +548,48 @@ fun SoundProfileCard(
                                 text = "PRO",
                                 color = AmberWake,
                                 fontSize = 9.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
                     text = profile.description,
                     color = Color.Gray,
-                    fontSize = 11.sp
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp
                 )
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Surface(shape = RoundedCornerShape(6.dp), color = MidnightDeep) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MidnightDeep
+                    ) {
                         Text(
-                            text = "Carrier: ${profile.carrierFreqHz.toInt()}Hz",
-                            color = Color.LightGray,
+                            text = "${profile.carrierFreqHz.toInt()} Hz Carrier",
+                            color = CyanAccent,
                             fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
+
                     if (profile.beatFreqHz > 0) {
-                        Surface(shape = RoundedCornerShape(6.dp), color = MidnightDeep) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MidnightDeep
+                        ) {
                             Text(
-                                text = "Beat: ${profile.beatFreqHz}Hz",
-                                color = CyanAccent,
+                                text = "${profile.beatFreqHz.toInt()} Hz Beat",
+                                color = LavenderRest,
                                 fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
@@ -322,22 +597,40 @@ fun SoundProfileCard(
                 }
             }
 
+            Spacer(modifier = Modifier.width(12.dp))
+
             // Play / Stop button
-            IconButton(
-                onClick = onTogglePlay,
+            Box(
                 modifier = Modifier
-                    .size(44.dp)
-                    .background(
-                        if (isPlaying) CyanAccent else MidnightSurfaceElevated,
-                        CircleShape
-                    )
+                    .size(46.dp)
+                    .clip(CircleShape)
+                    .background(if (isPlaying) AmberWake else CyanAccent)
+                    .clickable { onTogglePlay() },
+                contentAlignment = Alignment.Center
             ) {
-                if (isLocked) {
-                    Icon(Icons.Default.Lock, contentDescription = "Pro Only", tint = AmberWake, modifier = Modifier.size(18.dp))
-                } else if (isPlaying) {
-                    Icon(Icons.Default.Stop, contentDescription = "Stop", tint = MidnightDeep, modifier = Modifier.size(22.dp))
+                if (isPlaying) {
+                    Icon(
+                        imageVector = Icons.Default.Stop,
+                        contentDescription = "Stop",
+                        tint = MidnightDeep,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .scale(pulseScale)
+                    )
+                } else if (profile.isProOnly && !isPro) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = "Pro Only",
+                        tint = MidnightDeep,
+                        modifier = Modifier.size(20.dp)
+                    )
                 } else {
-                    Icon(Icons.Default.PlayArrow, contentDescription = "Preview", tint = Color.White, modifier = Modifier.size(22.dp))
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = "Preview Tone",
+                        tint = MidnightDeep,
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
             }
         }
@@ -346,77 +639,91 @@ fun SoundProfileCard(
 
 @Composable
 fun VibrationPatternsTesterCard(context: Context) {
+    val vibrator = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+            vm?.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        }
+    }
+
     Card(
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MidnightSurfaceElevated),
+        colors = CardDefaults.cardColors(containerColor = MidnightSurfaceCard),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .border(1.dp, MidnightSurfaceElevated, RoundedCornerShape(20.dp))
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Vibration, contentDescription = null, tint = AmberWake, modifier = Modifier.size(18.dp))
+                Icon(
+                    imageVector = Icons.Default.Vibration,
+                    contentDescription = null,
+                    tint = AmberWake,
+                    modifier = Modifier.size(18.dp)
+                )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Vibration Rhythm Studio",
+                    text = "Haptic Vibration Motor Tester",
                     color = Color.White,
-                    fontSize = 14.sp,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
-            Spacer(modifier = Modifier.height(4.dp))
+
+            Spacer(modifier = Modifier.height(6.dp))
+
             Text(
-                text = "Test custom haptic pulse rhythms designed to awaken your tactile senses.",
+                text = "Feel how the alarm motor will buzz you awake. Test distinct physical patterns.",
                 color = Color.Gray,
-                fontSize = 11.sp
+                fontSize = 12.sp
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+
+            val patterns = listOf(
+                "Heartbeat" to longArrayOf(0, 180, 120, 350, 750),
+                "Gentle Pulse" to longArrayOf(0, 500, 1000),
+                "Rapid Staccato" to longArrayOf(0, 100, 80, 100, 80, 100, 500)
+            )
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                VibrateTestButton("Heartbeat", longArrayOf(0, 180, 120, 350), context, Modifier.weight(1f))
-                VibrateTestButton("Gentle", longArrayOf(0, 400), context, Modifier.weight(1f))
-                VibrateTestButton("Staccato", longArrayOf(0, 100, 80, 100), context, Modifier.weight(1f))
+                patterns.forEach { (name, pattern) ->
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MidnightSurfaceElevated,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable {
+                                try {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                        vibrator?.vibrate(VibrationEffect.createWaveform(pattern, -1))
+                                    } else {
+                                        @Suppress("DEPRECATION")
+                                        vibrator?.vibrate(pattern, -1)
+                                    }
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            }
+                    ) {
+                        Text(
+                            text = name,
+                            color = CyanAccent,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(vertical = 10.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
             }
         }
-    }
-}
-
-@Composable
-fun VibrateTestButton(
-    title: String,
-    pattern: LongArray,
-    context: Context,
-    modifier: Modifier = Modifier
-) {
-    Button(
-        onClick = {
-            try {
-                val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    val manager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
-                    manager?.defaultVibrator
-                } else {
-                    @Suppress("DEPRECATION")
-                    context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    vibrator?.vibrate(VibrationEffect.createWaveform(pattern, -1))
-                } else {
-                    @Suppress("DEPRECATION")
-                    vibrator?.vibrate(pattern, -1)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        },
-        colors = ButtonDefaults.buttonColors(containerColor = MidnightSurfaceCard),
-        shape = RoundedCornerShape(10.dp),
-        contentPadding = PaddingValues(vertical = 8.dp),
-        modifier = modifier
-    ) {
-        Text(text = title, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
     }
 }

@@ -26,6 +26,7 @@ class AlarmService : Service() {
     private lateinit var synthesizer: AudioToneSynthesizer
     private var vibrator: Vibrator? = null
     private var isVibrating = false
+    private var customMediaPlayer: android.media.MediaPlayer? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -66,9 +67,30 @@ class AlarmService : Service() {
         val notification = buildAlarmNotification(alarmId, alarmLabel, shiftTag)
         startForeground(NOTIFICATION_ID, notification)
 
-        // Start synthesized sound profile
-        val profile = SoundProfiles.getById(soundProfileId)
-        synthesizer.startProfile(profile, volume = 0.85f, progressiveRampMinutes = rampMinutes)
+        // Start sound profile (Custom ringtone or Synthesized tone)
+        val profile = SoundProfiles.getById(soundProfileId, this)
+        if (!profile.customUriString.isNullOrBlank()) {
+            try {
+                val uri = android.net.Uri.parse(profile.customUriString)
+                customMediaPlayer = android.media.MediaPlayer().apply {
+                    setDataSource(this@AlarmService, uri)
+                    setAudioAttributes(
+                        android.media.AudioAttributes.Builder()
+                            .setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .build()
+                    )
+                    isLooping = true
+                    prepare()
+                    start()
+                }
+            } catch (e: Exception) {
+                // Fallback to synthesized audio if custom ringtone URI inaccessible
+                synthesizer.startProfile(profile, volume = 0.85f, progressiveRampMinutes = rampMinutes)
+            }
+        } else {
+            synthesizer.startProfile(profile, volume = 0.85f, progressiveRampMinutes = rampMinutes)
+        }
 
         // Start vibration
         startVibration(vibrationPattern)
@@ -99,6 +121,11 @@ class AlarmService : Service() {
     }
 
     private fun stopAlarm() {
+        try {
+            customMediaPlayer?.stop()
+            customMediaPlayer?.release()
+        } catch (_: Exception) {}
+        customMediaPlayer = null
         synthesizer.stop()
         if (isVibrating) {
             vibrator?.cancel()

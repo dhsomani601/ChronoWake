@@ -59,6 +59,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isShiftWizardOpen = MutableStateFlow(false)
     val isShiftWizardOpen: StateFlow<Boolean> = _isShiftWizardOpen.asStateFlow()
 
+    private val _editingShift = MutableStateFlow<ShiftScheduleEntity?>(null)
+    val editingShift: StateFlow<ShiftScheduleEntity?> = _editingShift.asStateFlow()
+
     private val _isPaywallOpen = MutableStateFlow(false)
     val isPaywallOpen: StateFlow<Boolean> = _isPaywallOpen.asStateFlow()
 
@@ -132,12 +135,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Shift Schedule Actions
-    fun openShiftWizard() {
+    fun openShiftWizard(shift: ShiftScheduleEntity? = null) {
+        _editingShift.value = shift
         _isShiftWizardOpen.value = true
     }
 
     fun closeShiftWizard() {
         _isShiftWizardOpen.value = false
+        _editingShift.value = null
     }
 
     fun saveShiftSchedule(shift: ShiftScheduleEntity) {

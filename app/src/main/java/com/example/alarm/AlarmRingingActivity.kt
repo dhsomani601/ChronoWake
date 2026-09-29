@@ -3,8 +3,15 @@ package com.example.alarm
 import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -36,12 +43,16 @@ import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Snooze
+import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -52,11 +63,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -71,13 +84,19 @@ import com.example.ui.theme.CyanAccent
 import com.example.ui.theme.MidnightDeep
 import com.example.ui.theme.MidnightSurface
 import com.example.ui.theme.MidnightSurfaceCard
+import com.example.ui.theme.MidnightSurfaceElevated
 import com.example.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class AlarmRingingActivity : ComponentActivity() {
+class AlarmRingingActivity : ComponentActivity(), SensorEventListener {
+
+    private var sensorManager: SensorManager? = null
+    private var accelerometer: Sensor? = null
+    private val shakeCountState = mutableIntStateOf(0)
+    private var lastShakeTimestamp = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -104,12 +123,21 @@ class AlarmRingingActivity : ComponentActivity() {
         val challengeType = intent.getStringExtra(AlarmReceiver.EXTRA_CHALLENGE) ?: "NONE"
         val shiftTag = intent.getStringExtra(AlarmReceiver.EXTRA_SHIFT_TAG)
 
+        // Setup Accelerometer for Shake Challenge
+        sensorManager = getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+        accelerometer = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+
         setContent {
             MyApplicationTheme(darkTheme = true) {
                 RingingScreen(
                     alarmLabel = alarmLabel,
                     shiftTag = shiftTag,
                     challengeType = challengeType,
+                    liveShakeCount = shakeCountState.intValue,
+                    onManualShake = {
+                        shakeCountState.intValue += 1
+                        hapticBuzz()
+                    },
                     onDismiss = {
                         dismissAlarm()
                     },
@@ -119,6 +147,60 @@ class AlarmRingingActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        accelerometer?.let {
+            sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        sensorManager?.unregisterListener(this)
+    }
+
+    override fun onSensorChanged(event: SensorEvent?) {
+        if (event?.sensor?.type == Sensor.TYPE_ACCELEROMETER) {
+            val x = event.values[0]
+            val y = event.values[1]
+            val z = event.values[2]
+
+            val gX = x / SensorManager.GRAVITY_EARTH
+            val gY = y / SensorManager.GRAVITY_EARTH
+            val gZ = z / SensorManager.GRAVITY_EARTH
+            val gForce = Math.sqrt((gX * gX + gY * gY + gZ * gZ).toDouble()).toFloat()
+
+            if (gForce > 2.0f) {
+                val now = System.currentTimeMillis()
+                if (now - lastShakeTimestamp > 320) {
+                    lastShakeTimestamp = now
+                    shakeCountState.intValue += 1
+                    hapticBuzz()
+                }
+            }
+        }
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+
+    private fun hapticBuzz() {
+        try {
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vm = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                vm?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator?.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator?.vibrate(50)
+            }
+        } catch (_: Exception) {}
     }
 
     private fun dismissAlarm() {
@@ -145,6 +227,8 @@ fun RingingScreen(
     alarmLabel: String,
     shiftTag: String?,
     challengeType: String,
+    liveShakeCount: Int,
+    onManualShake: () -> Unit,
     onDismiss: () -> Unit,
     onSnooze: (Int) -> Unit
 ) {
@@ -175,14 +259,54 @@ fun RingingScreen(
         label = "pulseScale"
     )
 
-    // Challenge state
-    var mathNum1 by remember { mutableStateOf((12..49).random()) }
-    var mathNum2 by remember { mutableStateOf((11..39).random()) }
+    // Math Challenge state
+    var mathNum1 by remember { mutableIntStateOf((14..48).random()) }
+    var mathNum2 by remember { mutableIntStateOf((12..39).random()) }
+    var mathOp by remember { mutableStateOf(listOf("+", "-", "*").random()) }
     var mathAnswerInput by remember { mutableStateOf("") }
     var mathError by remember { mutableStateOf(false) }
+    var mathSuccess by remember { mutableStateOf(false) }
 
-    var shakeCount by remember { mutableStateOf(0) }
-    val shakeTarget = 12
+    fun generateNewMathProblem() {
+        mathOp = listOf("+", "-", "*").random()
+        when (mathOp) {
+            "*" -> {
+                mathNum1 = (3..9).random()
+                mathNum2 = (4..9).random()
+            }
+            "-" -> {
+                mathNum1 = (30..80).random()
+                mathNum2 = (10..29).random()
+            }
+            else -> {
+                mathNum1 = (15..55).random()
+                mathNum2 = (14..45).random()
+            }
+        }
+        mathAnswerInput = ""
+        mathError = false
+    }
+
+    val expectedMathAnswer = remember(mathNum1, mathNum2, mathOp) {
+        when (mathOp) {
+            "+" -> mathNum1 + mathNum2
+            "-" -> mathNum1 - mathNum2
+            "*" -> mathNum1 * mathNum2
+            else -> mathNum1 + mathNum2
+        }
+    }
+
+    // Shake challenge threshold
+    val shakeTarget = 15
+    val currentShakes = liveShakeCount
+
+    // Auto dismiss on shake completion
+    LaunchedEffect(currentShakes) {
+        if (challengeType == "SHAKE" && currentShakes >= shakeTarget) {
+            delay(400)
+            onDismiss()
+        }
+    }
 
     Scaffold(
         containerColor = MidnightDeep
@@ -212,7 +336,7 @@ fun RingingScreen(
                 // Top status header
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(top = 24.dp)
+                    modifier = Modifier.padding(top = 16.dp)
                 ) {
                     if (!shiftTag.isNullOrBlank()) {
                         Surface(
@@ -221,7 +345,7 @@ fun RingingScreen(
                             modifier = Modifier.padding(bottom = 8.dp)
                         ) {
                             Text(
-                                text = "⚡ $shiftTag SHIFT SCHEDULE",
+                                text = "⚡ $shiftTag SCHEDULE",
                                 color = CyanAccent,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
@@ -232,9 +356,9 @@ fun RingingScreen(
 
                     Text(
                         text = alarmLabel,
-                        color = Color.White.copy(alpha = 0.85f),
+                        color = Color.White.copy(alpha = 0.9f),
                         fontSize = 20.sp,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Bold
                     )
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -242,30 +366,28 @@ fun RingingScreen(
                     Text(
                         text = currentDateString,
                         color = Color.Gray,
-                        fontSize = 14.sp
+                        fontSize = 13.sp
                     )
                 }
 
                 // Middle pulsing circadian clock
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(260.dp)
+                    modifier = Modifier.size(240.dp)
                 ) {
-                    // Outer glow rings
                     Box(
                         modifier = Modifier
-                            .size(240.dp)
+                            .size(220.dp)
                             .scale(pulseScale)
                             .border(2.dp, CyanAccent.copy(alpha = 0.35f), CircleShape)
                     )
                     Box(
                         modifier = Modifier
-                            .size(200.dp)
+                            .size(180.dp)
                             .scale(pulseScale * 0.95f)
                             .border(1.5.dp, AmberWake.copy(alpha = 0.45f), CircleShape)
                     )
 
-                    // Core time container
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
@@ -275,14 +397,14 @@ fun RingingScreen(
                             contentDescription = "Ringing",
                             tint = CyanAccent,
                             modifier = Modifier
-                                .size(36.dp)
-                                .padding(bottom = 6.dp)
+                                .size(32.dp)
+                                .padding(bottom = 4.dp)
                         )
 
                         Text(
                             text = currentTimeString.ifEmpty { "--:--" },
                             color = Color.White,
-                            fontSize = 62.sp,
+                            fontSize = 56.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = (-1).sp
                         )
@@ -290,7 +412,7 @@ fun RingingScreen(
                         Text(
                             text = "Circadian Wake Window",
                             color = AmberWake,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -300,36 +422,63 @@ fun RingingScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 20.dp),
+                        .padding(bottom = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     when (challengeType) {
+                        // 1. WORKABLE MATH PUZZLE CHALLENGE
                         "MATH" -> {
                             Card(
                                 shape = RoundedCornerShape(20.dp),
                                 colors = CardDefaults.cardColors(containerColor = MidnightSurfaceCard),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(bottom = 16.dp)
+                                    .padding(bottom = 14.dp)
+                                    .border(1.dp, MidnightSurfaceElevated, RoundedCornerShape(20.dp))
                             ) {
                                 Column(
                                     modifier = Modifier.padding(16.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Math Wake Challenge",
+                                            color = AmberWake,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        IconButton(
+                                            onClick = { generateNewMathProblem() },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(Icons.Default.Refresh, contentDescription = "New Equation", tint = Color.Gray, modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(6.dp))
+
                                     Text(
-                                        text = "Solve to Dismiss Alarm",
-                                        color = AmberWake,
-                                        fontSize = 14.sp,
+                                        text = "$mathNum1 $mathOp $mathNum2 = ?",
+                                        color = if (mathError) Color(0xFFEF4444) else Color.White,
+                                        fontSize = 32.sp,
                                         fontWeight = FontWeight.Bold
                                     )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = "$mathNum1 + $mathNum2 = ?",
-                                        color = Color.White,
-                                        fontSize = 28.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    if (mathError) {
+                                        Text(
+                                            text = "Incorrect! Try again.",
+                                            color = Color(0xFFFCA5A5),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         modifier = Modifier.fillMaxWidth()
@@ -339,34 +488,39 @@ fun RingingScreen(
                                             onValueChange = {
                                                 mathAnswerInput = it
                                                 mathError = false
+                                                if (it.trim() == expectedMathAnswer.toString()) {
+                                                    mathSuccess = true
+                                                    onDismiss()
+                                                }
                                             },
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .testTag("math_answer_input"),
-                                            placeholder = { Text("Answer") },
+                                            placeholder = { Text("Enter Answer") },
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                             singleLine = true,
                                             isError = mathError,
                                             colors = OutlinedTextFieldDefaults.colors(
                                                 focusedTextColor = Color.White,
-                                                unfocusedTextColor = Color.White
+                                                unfocusedTextColor = Color.White,
+                                                focusedBorderColor = CyanAccent,
+                                                unfocusedBorderColor = Color(0xFF334155)
                                             )
                                         )
                                         Spacer(modifier = Modifier.width(10.dp))
                                         Button(
                                             onClick = {
-                                                val expected = mathNum1 + mathNum2
-                                                if (mathAnswerInput.trim() == expected.toString()) {
+                                                if (mathAnswerInput.trim() == expectedMathAnswer.toString()) {
+                                                    mathSuccess = true
                                                     onDismiss()
                                                 } else {
                                                     mathError = true
-                                                    mathNum1 = (15..45).random()
-                                                    mathNum2 = (12..35).random()
-                                                    mathAnswerInput = ""
+                                                    generateNewMathProblem()
                                                 }
                                             },
                                             modifier = Modifier.testTag("submit_math_answer"),
-                                            colors = ButtonDefaults.buttonColors(containerColor = CyanAccent)
+                                            colors = ButtonDefaults.buttonColors(containerColor = CyanAccent),
+                                            shape = RoundedCornerShape(12.dp)
                                         ) {
                                             Icon(Icons.Default.Check, contentDescription = "Submit", tint = MidnightDeep)
                                         }
@@ -374,46 +528,72 @@ fun RingingScreen(
                                 }
                             }
                         }
+
+                        // 2. WORKABLE SHAKE CHALLENGE (Hardware Accelerometer + Manual Fallback)
                         "SHAKE" -> {
                             Card(
                                 shape = RoundedCornerShape(20.dp),
                                 colors = CardDefaults.cardColors(containerColor = MidnightSurfaceCard),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(bottom = 16.dp)
+                                    .padding(bottom = 14.dp)
+                                    .border(1.dp, MidnightSurfaceElevated, RoundedCornerShape(20.dp))
                             ) {
                                 Column(
                                     modifier = Modifier.padding(16.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Vibration, contentDescription = null, tint = AmberWake, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "Shake Device to Dismiss",
+                                            color = AmberWake,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
                                     Text(
-                                        text = "Shake Challenge",
-                                        color = AmberWake,
-                                        fontSize = 14.sp,
+                                        text = "$currentShakes / $shakeTarget Shakes",
+                                        color = Color.White,
+                                        fontSize = 22.sp,
                                         fontWeight = FontWeight.Bold
                                     )
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Text(
-                                        text = "Tap or shake device to wake up ($shakeCount / $shakeTarget)",
-                                        color = Color.White,
-                                        fontSize = 14.sp
-                                    )
+
                                     Spacer(modifier = Modifier.height(10.dp))
+
+                                    LinearProgressIndicator(
+                                        progress = { (currentShakes.toFloat() / shakeTarget).coerceIn(0f, 1f) },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(10.dp)
+                                            .clip(RoundedCornerShape(5.dp)),
+                                        color = CyanAccent,
+                                        trackColor = MidnightSurfaceElevated
+                                    )
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    // Manual Shake tap fallback for emulator/testing
                                     Button(
-                                        onClick = {
-                                            shakeCount++
-                                            if (shakeCount >= shakeTarget) {
-                                                onDismiss()
-                                            }
-                                        },
-                                        modifier = Modifier.testTag("shake_button"),
-                                        colors = ButtonDefaults.buttonColors(containerColor = CyanAccent)
+                                        onClick = onManualShake,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("shake_button"),
+                                        colors = ButtonDefaults.buttonColors(containerColor = CyanAccent),
+                                        shape = RoundedCornerShape(12.dp)
                                     ) {
+                                        Icon(Icons.Default.Vibration, contentDescription = null, tint = MidnightDeep, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
                                         Text("Tap to Shake (+1)", color = MidnightDeep, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
                         }
+
                         else -> {
                             // Direct Dismiss Button
                             Button(
@@ -439,50 +619,35 @@ fun RingingScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     // Snooze buttons row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         OutlinedButton(
                             onClick = { onSnooze(5) },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(48.dp)
                                 .testTag("snooze_5_button"),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(Icons.Default.Snooze, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Snooze, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("5 Min", fontSize = 13.sp)
+                            Text("5m Snooze", color = Color.White, fontSize = 12.sp)
                         }
 
                         OutlinedButton(
-                            onClick = { onSnooze(9) },
+                            onClick = { onSnooze(10) },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(48.dp)
-                                .testTag("snooze_9_button"),
+                                .testTag("snooze_10_button"),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(Icons.Default.Snooze, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Snooze, contentDescription = null, tint = AmberWake, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("9 Min", fontSize = 13.sp)
-                        }
-
-                        OutlinedButton(
-                            onClick = { onSnooze(15) },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(48.dp)
-                                .testTag("snooze_15_button"),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Default.Snooze, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("15 Min", fontSize = 13.sp)
+                            Text("10m Snooze", color = AmberWake, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

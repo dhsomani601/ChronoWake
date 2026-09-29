@@ -143,6 +143,10 @@ class AudioToneSynthesizer(private val context: Context) {
                         sampleL = if (isBeeping) sin(phaseLeft) else 0.0
                         sampleR = sampleL
                     }
+                    else -> {
+                        sampleL = sin(phaseLeft)
+                        sampleR = sin(phaseRight)
+                    }
                 }
 
                 phaseLeft = (phaseLeft + phaseLeftInc) % (2.0 * PI)

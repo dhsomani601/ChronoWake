@@ -109,6 +109,7 @@ fun MainApp(viewModel: MainViewModel = viewModel()) {
     val editingAlarm by viewModel.editingAlarm.collectAsStateWithLifecycle()
     val isAddAlarmOpen by viewModel.isAddAlarmOpen.collectAsStateWithLifecycle()
     val isShiftWizardOpen by viewModel.isShiftWizardOpen.collectAsStateWithLifecycle()
+    val editingShift by viewModel.editingShift.collectAsStateWithLifecycle()
     val isPaywallOpen by viewModel.isPaywallOpen.collectAsStateWithLifecycle()
     val previewingProfileId by viewModel.previewingProfileId.collectAsStateWithLifecycle()
     val statusMessage by viewModel.backupStatusMessage.collectAsStateWithLifecycle()
@@ -145,41 +146,29 @@ fun MainApp(viewModel: MainViewModel = viewModel()) {
                             }
                         }
                         Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "ChronoWake",
-                                    color = Color.White,
-                                    fontSize = 19.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.5.sp
-                                )
-                                if (isPro) {
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Surface(
-                                        shape = RoundedCornerShape(4.dp),
-                                        color = AmberWake
-                                    ) {
-                                        Text(
-                                            text = "PRO",
-                                            color = MidnightDeep,
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
-                                        )
-                                    }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "ChronoWake",
+                                color = Color.White,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp
+                            )
+                            if (isPro) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = AmberWake
+                                ) {
+                                    Text(
+                                        text = "PRO",
+                                        color = MidnightDeep,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                    )
                                 }
                             }
-                            Text(
-                                text = when (currentTab) {
-                                    0 -> "Smart Alarms & Wake Schedules"
-                                    1 -> "Shift Worker Periodic Rotations"
-                                    2 -> "Binaural & Acoustic Sound Lab"
-                                    else -> "Cloud Sync & Configuration"
-                                },
-                                color = Color.Gray,
-                                fontSize = 11.sp
-                            )
                         }
                     }
                 },
@@ -255,7 +244,8 @@ fun MainApp(viewModel: MainViewModel = viewModel()) {
                     1 -> ShiftScreen(
                         shifts = shifts,
                         isPro = isPro,
-                        onOpenWizard = { viewModel.openShiftWizard() },
+                        onOpenWizard = { viewModel.openShiftWizard(null) },
+                        onEditShift = { viewModel.openShiftWizard(it) },
                         onToggleShift = { shift, active -> viewModel.toggleShiftActive(shift, active) },
                         onDeleteShift = { viewModel.deleteShiftSchedule(it) },
                         onOpenPaywall = { viewModel.openPaywall() }
@@ -292,6 +282,7 @@ fun MainApp(viewModel: MainViewModel = viewModel()) {
 
     if (isShiftWizardOpen) {
         ShiftWizardDialog(
+            initialShift = editingShift,
             onDismiss = { viewModel.closeShiftWizard() },
             onSave = { newShift -> viewModel.saveShiftSchedule(newShift) }
         )
